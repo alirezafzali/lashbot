@@ -17,6 +17,9 @@ def create_llm_provider(settings: Settings) -> LLMProvider:
                 api_key=settings.google_api_key,
                 model=settings.gemini_model,
                 default_max_output_tokens=settings.gemini_max_output_tokens,
+                max_retries=settings.gemini_max_retries,
+                retry_base_delay_seconds=settings.gemini_retry_base_delay_seconds,
+                retry_max_delay_seconds=settings.gemini_retry_max_delay_seconds,
             )
         case provider:
             raise ValueError(f"Unknown LLM_PROVIDER: {provider}")

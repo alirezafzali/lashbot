@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     llm_provider: str = "gemini"
     gemini_model: str = "gemini-2.5-flash"
     gemini_max_output_tokens: int = 1024
+    gemini_max_retries: int = 3
+    gemini_retry_base_delay_seconds: float = 1.0
+    gemini_retry_max_delay_seconds: float = 8.0
 
     database_url: str = "postgresql://lashbot:lashbot@localhost:5432/lashbot"
     recap_message_count: int = 50

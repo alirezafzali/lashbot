@@ -33,6 +33,9 @@ Add the bot to your friends group. Talk to it by **@mentioning** it or **replyin
 | `GOOGLE_API_KEY` | Gemini API key |
 | `LLM_PROVIDER` | `gemini` (default); extend under `app/llm/` |
 | `GEMINI_MODEL` | e.g. `gemini-2.5-flash` |
+| `GEMINI_MAX_RETRIES` | Extra attempts on 503/429 (default 3 → 4 calls max) |
+| `GEMINI_RETRY_BASE_DELAY_SECONDS` | Backoff start (default 1s) |
+| `GEMINI_RETRY_MAX_DELAY_SECONDS` | Backoff cap (default 8s) |
 | `RECAP_MESSAGE_COUNT` | Messages loaded for context (default 50) |
 | `MAX_TRANSCRIPT_CHARS` | Cap on transcript size sent to the LLM |
 | `ALLOWED_CHAT_IDS` | Optional comma-separated allowlist |
