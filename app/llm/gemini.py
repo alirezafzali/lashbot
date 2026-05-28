@@ -36,6 +36,10 @@ class GeminiProvider:
     def name(self) -> str:
         return "gemini"
 
+    @property
+    def supports_audio_input(self) -> bool:
+        return True
+
     async def generate(self, request: LLMRequest) -> LLMResponse:
         parts = [_content_part_to_gemini(part) for part in request.user_parts]
         max_tokens = request.max_output_tokens or self._default_max_output_tokens

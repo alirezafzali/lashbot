@@ -64,10 +64,16 @@ def main() -> None:
                 create_group_message_handler(bot_ctx),
             )
         )
+        model_label = (
+            settings.openrouter_model
+            if settings.llm_provider.lower() == "openrouter"
+            else settings.gemini_model
+        )
         logger.info(
-            "lashbot ready as @%s (llm=%s)",
+            "lashbot ready as @%s (provider=%s, model=%s)",
             bot_ctx.bot_username,
             settings.llm_provider,
+            model_label,
         )
 
     async def post_shutdown(app: Application) -> None:

@@ -178,20 +178,12 @@ async def _handle_triggered_reply(
         audio = await download_voice_or_audio(replied, context)
         if audio:
             data, mime_type = audio
-            user_parts.append(
-                TextPart(
-                    text=(
-                        "The user is replying to a voice/audio message. "
-                        "Summarize or transcribe the attached audio."
-                    )
-                )
-            )
-            user_parts.append(AudioPart(data=data, mime_type=mime_type))
+            await _add_voice_context(user_parts, bot_ctx, data, mime_type, chat_id)
 
     request = LLMRequest(
         system_instruction=SYSTEM_PROMPT,
         user_parts=user_parts,
-        max_output_tokens=bot_ctx.settings.gemini_max_output_tokens,
+        max_output_tokens=bot_ctx.settings.llm_max_output_tokens,
     )
 
     try:
@@ -215,6 +207,37 @@ async def _handle_triggered_reply(
 
     for chunk in _split_message(reply_text):
         await message.reply_text(chunk)
+
+
+async def _add_voice_context(
+    user_parts: list[TextPart | AudioPart],
+    bot_ctx: BotContext,
+    data: bytes,
+    mime_type: str,
+    chat_id: int,
+) -> None:
+    if getattr(bot_ctx.llm, "supports_audio_input", False):
+        user_parts.append(
+            TextPart(
+                text=(
+                    "The user is replying to a voice/audio message. "
+                    "Listen to the attached audio, then answer their question."
+                )
+            )
+        )
+        user_parts.append(AudioPart(data=data, mime_type=mime_type))
+        return
+
+    logger.warning("LLM does not support audio chat_id=%s", chat_id)
+    user_parts.append(
+        TextPart(
+            text=(
+                "The user replied to a voice message but this model cannot "
+                "process audio. Ask them to type their question, or set "
+                "OPENROUTER_MODEL to a multimodal model (e.g. google/gemini-2.5-flash)."
+            )
+        )
+    )
 
 
 def _parse_message(message: Message) -> tuple[str, str | None, dict[str, Any]] | None:

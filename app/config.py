@@ -19,10 +19,21 @@ class Settings(BaseSettings):
     )
 
     telegram_bot_token: str
+
+    llm_provider: str = "openrouter"
+    llm_max_output_tokens: int = 1024
+
+    openrouter_api_key: str = ""
+    # One multimodal model for chat + voice (production Gemini via OpenRouter)
+    openrouter_model: str = "google/gemini-2.5-flash"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_max_retries: int = 3
+    openrouter_retry_base_delay_seconds: float = 1.0
+    openrouter_retry_max_delay_seconds: float = 8.0
+    openrouter_timeout_seconds: float = 120.0
+
     google_api_key: str = ""
-    llm_provider: str = "gemini"
-    gemini_model: str = "gemini-2.5-flash"
-    gemini_max_output_tokens: int = 1024
+    gemini_model: str = "gemini-2.0-flash"
     gemini_max_retries: int = 3
     gemini_retry_base_delay_seconds: float = 1.0
     gemini_retry_max_delay_seconds: float = 8.0

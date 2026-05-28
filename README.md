@@ -1,64 +1,43 @@
 # lashbot
 
-A Dockerized Telegram group companion bot. It logs group messages to Postgres, chats like a friend when @mentioned or replied to, and can recap recent messages or summarize voice notes via Gemini (behind a swappable LLM adapter).
+Telegram group companion bot with a swappable LLM adapter. Default: **one OpenRouter model** for text chat and voice notes.
 
 ## Prerequisites
 
-1. Create a bot with [@BotFather](https://t.me/BotFather) and note the token and username (e.g. `@lashbot`).
-2. **Disable privacy mode** so the bot receives all group messages: `/setprivacy` → **Disable**.
-3. Get a [Google AI Studio](https://aistudio.google.com/apikey) API key (`GOOGLE_API_KEY`).
+1. [@BotFather](https://t.me/BotFather) bot token; **disable privacy mode** (`/setprivacy` → Disable).
+2. [OpenRouter](https://openrouter.ai) API key with credit.
 
 ## Quick start
 
 ```bash
 cp .env.example .env
-# Edit .env: TELEGRAM_BOT_TOKEN, GOOGLE_API_KEY
+# TELEGRAM_BOT_TOKEN, OPENROUTER_API_KEY
 
 docker compose up --build
 ```
 
-Add the bot to your friends group. Talk to it by **@mentioning** it or **replying** to one of its messages.
+## One model for everything
 
-## Examples
+Set a single `OPENROUTER_MODEL` that supports **text + audio**:
 
-- `@lashbot catch me up`
-- `@lashbot summarize the last messages`
-- Reply to a voice note, mention the bot: `@lashbot what did they say?`
+| Model | Chat | Voice | Notes |
+|-------|------|-------|-------|
+| `google/gemini-2.5-flash` | **Default** — production Gemini | Yes | Best balance for a friends bot |
+| `google/gemini-2.0-flash-001` | Fast Gemini 2.0 | Yes | Slightly cheaper |
+| `meta-llama/llama-3.3-70b-instruct` | Strong 70B text | No | Text-only, very cheap on Groq |
+
+Voice uses the **same model** in **one API call** (transcript + your question + audio).
 
 ## Configuration
 
 | Variable | Description |
 |----------|-------------|
-| `TELEGRAM_BOT_TOKEN` | Bot token from BotFather |
-| `GOOGLE_API_KEY` | Gemini API key |
-| `LLM_PROVIDER` | `gemini` (default); extend under `app/llm/` |
-| `GEMINI_MODEL` | e.g. `gemini-2.5-flash` |
-| `GEMINI_MAX_RETRIES` | Extra attempts on 503/429 (default 3 → 4 calls max) |
-| `GEMINI_RETRY_BASE_DELAY_SECONDS` | Backoff start (default 1s) |
-| `GEMINI_RETRY_MAX_DELAY_SECONDS` | Backoff cap (default 8s) |
-| `RECAP_MESSAGE_COUNT` | Messages loaded for context (default 50) |
-| `MAX_TRANSCRIPT_CHARS` | Cap on transcript size sent to the LLM |
-| `ALLOWED_CHAT_IDS` | Optional comma-separated allowlist |
+| `OPENROUTER_MODEL` | Used for all LLM requests |
+| `LLM_PROVIDER` | `openrouter` (default) or `gemini` (direct Google API) |
 
-## Limitations
-
-- Recap/history only includes messages **since the bot was added** to the group.
-- The bot only replies when @mentioned or when you reply to its message.
-
-## Swapping the LLM later
-
-1. Implement `LLMProvider` in a new file under `app/llm/`.
-2. Register it in `create_llm_provider()` in `app/llm/__init__.py`.
-3. Set `LLM_PROVIDER` in `.env`.
-
-Handlers do not import Gemini directly.
-
-## Local development (without Docker)
+## Local development
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
-# Run Postgres and set DATABASE_URL in .env
 python -m app.main
 ```
