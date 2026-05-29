@@ -10,10 +10,12 @@ from telegram.ext import ContextTypes
 
 from app.config import Settings
 from app.db import Database
+from app.gif_reply import parse_send_gif_marker
 from app.llm.base import LLMProvider
-from app.llm.types import AudioPart, LLMError, LLMRequest, TextPart
-from app.media import download_voice_or_audio
+from app.llm.types import AudioPart, ImagePart, LLMError, LLMRequest, TextPart
+from app.media import download_visual, download_voice_or_audio
 from app.prompts import SYSTEM_PROMPT
+from app.giphy import pick_animation_url
 from app.transcript import build_transcript
 from app.trigger import is_triggered
 
@@ -147,7 +149,7 @@ async def _handle_triggered_reply(
         bot_ctx.bot_username,
     ).strip()
 
-    user_parts: list[TextPart | AudioPart] = []
+    user_parts: list[TextPart | AudioPart | ImagePart] = []
 
     if transcript:
         user_parts.append(
@@ -180,6 +182,15 @@ async def _handle_triggered_reply(
             data, mime_type = audio
             await _add_voice_context(user_parts, bot_ctx, data, mime_type, chat_id)
 
+    for source in (message, replied):
+        if source is None:
+            continue
+        visual = await download_visual(source, context)
+        if visual:
+            data, mime_type, kind = visual
+            await _add_visual_context(user_parts, bot_ctx, data, mime_type, kind, chat_id)
+            break
+
     request = LLMRequest(
         system_instruction=SYSTEM_PROMPT,
         user_parts=user_parts,
@@ -205,12 +216,38 @@ async def _handle_triggered_reply(
         logger.exception("Unexpected error during LLM call chat_id=%s", chat_id)
         reply_text = "Something went wrong on my end. Try again?"
 
+    reply_text, gif_query = parse_send_gif_marker(reply_text)
+
     for chunk in _split_message(reply_text):
-        await message.reply_text(chunk)
+        if chunk.strip():
+            await message.reply_text(chunk)
+
+    if gif_query and bot_ctx.settings.giphy_api_key.strip():
+        await _send_giphy_gif(message, bot_ctx.settings, gif_query)
+
+
+async def _send_giphy_gif(message: Message, settings: Settings, query: str) -> None:
+    try:
+        animation_url = await pick_animation_url(
+            query,
+            api_key=settings.giphy_api_key,
+            rating=settings.giphy_rating,
+        )
+    except Exception:
+        logger.exception("GIPHY search failed query=%r", query)
+        return
+
+    if not animation_url:
+        return
+
+    try:
+        await message.reply_animation(animation=animation_url)
+    except Exception:
+        logger.exception("Failed to send GIF query=%r", query)
 
 
 async def _add_voice_context(
-    user_parts: list[TextPart | AudioPart],
+    user_parts: list[TextPart | AudioPart | ImagePart],
     bot_ctx: BotContext,
     data: bytes,
     mime_type: str,
@@ -240,11 +277,48 @@ async def _add_voice_context(
     )
 
 
+async def _add_visual_context(
+    user_parts: list[TextPart | AudioPart | ImagePart],
+    bot_ctx: BotContext,
+    data: bytes,
+    mime_type: str,
+    kind: str,
+    chat_id: int,
+) -> None:
+    if not getattr(bot_ctx.llm, "supports_image_input", False):
+        logger.warning("LLM does not support images chat_id=%s", chat_id)
+        user_parts.append(
+            TextPart(
+                text=(
+                    f"The user attached a {kind} but this model cannot process "
+                    "images. Ask them to describe it in text."
+                )
+            )
+        )
+        return
+
+    label = {
+        "photo": "photo",
+        "animation": "GIF/animation",
+        "sticker": "sticker",
+        "document": "image",
+    }.get(kind, "visual attachment")
+
+    user_parts.append(
+        TextPart(
+            text=(
+                f"The user attached a {label}. Look at the attached media "
+                "and answer their message."
+            )
+        )
+    )
+    user_parts.append(ImagePart(data=data, mime_type=mime_type))
+
+
 def _parse_message(message: Message) -> tuple[str, str | None, dict[str, Any]] | None:
     if _is_service_message(message):
         return None
 
-    user = message.from_user
     base_meta: dict[str, Any] = {}
     if message.entities:
         base_meta["entities"] = [
@@ -264,6 +338,19 @@ def _parse_message(message: Message) -> tuple[str, str | None, dict[str, Any]] |
             "height": photo.height,
         }
         return "photo", message.caption, meta
+
+    if message.animation:
+        animation = message.animation
+        meta = {
+            **base_meta,
+            "file_id": animation.file_id,
+            "mime_type": animation.mime_type,
+            "duration": animation.duration,
+            "width": animation.width,
+            "height": animation.height,
+            "file_name": animation.file_name,
+        }
+        return "animation", message.caption, meta
 
     if message.video:
         meta = {

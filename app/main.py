@@ -4,11 +4,12 @@ import asyncio
 import logging
 import sys
 
-from telegram.ext import Application, MessageHandler, filters
+from telegram.ext import Application, InlineQueryHandler, MessageHandler, filters
 
 from app.config import Settings
 from app.db import Database
 from app.handlers import BotContext, create_group_message_handler
+from app.inline_handlers import create_inline_query_handler
 from app.llm import create_llm_provider
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ def main() -> None:
                 create_group_message_handler(bot_ctx),
             )
         )
+        app.add_handler(InlineQueryHandler(create_inline_query_handler(settings)))
         model_label = (
             settings.openrouter_model
             if settings.llm_provider.lower() == "openrouter"
@@ -92,7 +94,7 @@ def main() -> None:
 
     try:
         application.run_polling(
-            allowed_updates=["message"],
+            allowed_updates=["message", "inline_query"],
             drop_pending_updates=True,
         )
     except KeyboardInterrupt:

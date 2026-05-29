@@ -4,6 +4,7 @@ from app.db import StoredMessage
 
 _TYPE_LABELS = {
     "photo": "[photo]",
+    "animation": "[gif]",
     "video": "[video]",
     "document": "[document]",
     "sticker": "[sticker]",
@@ -64,7 +65,7 @@ def _message_body(msg: StoredMessage) -> str:
 
     label = _type_label(msg)
     duration = msg.metadata.get("duration")
-    if duration is not None and msg.message_type in ("voice", "audio", "video"):
+    if duration is not None and msg.message_type in ("voice", "audio", "video", "animation"):
         return f"{label} ({_format_duration(duration)})"
     return label
 

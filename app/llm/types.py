@@ -15,7 +15,13 @@ class AudioPart:
     mime_type: str
 
 
-ContentPart = Union[TextPart, AudioPart]
+@dataclass(frozen=True)
+class ImagePart:
+    data: bytes
+    mime_type: str
+
+
+ContentPart = Union[TextPart, AudioPart, ImagePart]
 
 
 @dataclass(frozen=True)

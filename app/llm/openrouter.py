@@ -9,7 +9,7 @@ from app.llm.openrouter_common import (
     post_chat_completion,
     response_model_id,
 )
-from app.llm.types import AudioPart, LLMError, LLMRequest, LLMResponse, TextPart
+from app.llm.types import AudioPart, ImagePart, LLMError, LLMRequest, LLMResponse, TextPart
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,10 @@ class OpenRouterProvider:
     def supports_audio_input(self) -> bool:
         return True
 
+    @property
+    def supports_image_input(self) -> bool:
+        return True
+
     async def generate(self, request: LLMRequest) -> LLMResponse:
         user_content = _build_user_content(request.user_parts)
         if user_content is None:
@@ -108,38 +112,53 @@ class OpenRouterProvider:
 
 
 def _build_user_content(
-    parts: list[TextPart | AudioPart],
+    parts: list[TextPart | AudioPart | ImagePart],
 ) -> str | list[dict[str, Any]] | None:
     text_blocks: list[str] = []
-    audio_parts: list[AudioPart] = []
+    media_blocks: list[dict[str, Any]] = []
 
     for part in parts:
         if isinstance(part, TextPart):
             if part.text.strip():
                 text_blocks.append(part.text)
+        elif isinstance(part, AudioPart):
+            media_blocks.append(
+                {
+                    "type": "input_audio",
+                    "input_audio": {
+                        "data": base64.b64encode(part.data).decode("ascii"),
+                        "format": _mime_to_format(part.mime_type),
+                    },
+                }
+            )
         else:
-            audio_parts.append(part)
+            media_blocks.append(_image_part_to_openrouter(part))
 
-    if not text_blocks and not audio_parts:
+    if not text_blocks and not media_blocks:
         return None
 
-    if not audio_parts:
+    if not media_blocks:
         return "\n\n".join(text_blocks)
 
     content: list[dict[str, Any]] = []
     if text_blocks:
         content.append({"type": "text", "text": "\n\n".join(text_blocks)})
-    for audio in audio_parts:
-        content.append(
-            {
-                "type": "input_audio",
-                "input_audio": {
-                    "data": base64.b64encode(audio.data).decode("ascii"),
-                    "format": _mime_to_format(audio.mime_type),
-                },
-            }
-        )
+    content.extend(media_blocks)
     return content
+
+
+def _image_part_to_openrouter(part: ImagePart) -> dict[str, Any]:
+    mime = part.mime_type.lower().split(";")[0].strip()
+    encoded = base64.b64encode(part.data).decode("ascii")
+    if mime.startswith("video/"):
+        return {
+            "type": "video_url",
+            "video_url": {"url": f"data:{mime};base64,{encoded}"},
+        }
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"data:{mime};base64,{encoded}"},
+    }
 
 
 def _mime_to_format(mime_type: str) -> str:

@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     allowed_chat_ids_raw: str = Field(default="", validation_alias="ALLOWED_CHAT_IDS")
     log_level: str = "INFO"
 
+    giphy_api_key: str = ""
+    giphy_rating: str = "pg"
+
     @property
     def allowed_chat_ids(self) -> set[int] | None:
         return _parse_allowed_chat_ids(self.allowed_chat_ids_raw)

@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 from google.genai.errors import APIError, ServerError
 
-from app.llm.types import AudioPart, LLMError, LLMRequest, LLMResponse, TextPart
+from app.llm.types import AudioPart, ImagePart, LLMError, LLMRequest, LLMResponse, TextPart
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,10 @@ class GeminiProvider:
 
     @property
     def supports_audio_input(self) -> bool:
+        return True
+
+    @property
+    def supports_image_input(self) -> bool:
         return True
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
@@ -126,7 +130,7 @@ def _retry_delay_seconds(
     return min(delay, max_delay)
 
 
-def _content_part_to_gemini(part: TextPart | AudioPart) -> types.Part:
+def _content_part_to_gemini(part: TextPart | AudioPart | ImagePart) -> types.Part:
     if isinstance(part, TextPart):
         return types.Part.from_text(text=part.text)
     return types.Part.from_bytes(data=part.data, mime_type=part.mime_type)
